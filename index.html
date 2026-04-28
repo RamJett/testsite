@@ -90,7 +90,7 @@
                 ||----w |
                 ||     ||
 
-<span class="prompt">ramjett@testsite</span>:<span style="color:#5fafff">~</span>$ <span class="cursor"></span></div>
+<span class="prompt">ramjett@testsite</span>:<span style="color:#5fafff">~</span>$ <span id="input"></span><span class="cursor"></span></div>
   </div>
 <script>
   const terminal = document.querySelector('.terminal');
@@ -111,6 +111,101 @@
     terminal.style.top = (e.clientY - oy) + 'px';
   });
   document.addEventListener('mouseup', () => { dragging = false; });
+
+  const screen = document.querySelector('.screen');
+  let inputEl = document.getElementById('input');
+  let cursorEl = document.querySelector('.cursor');
+
+  const PROMPT_HTML = '<span class="prompt">ramjett@testsite</span>:<span style="color:#5fafff">~</span>$ ';
+
+  function cowsay(text) {
+    const msg = (text || '').replace(/\t/g, '    ');
+    const words = msg.split(/\s+/).filter(Boolean);
+    const lines = [];
+    let cur = '';
+    for (const w of words) {
+      if (!cur) cur = w;
+      else if (cur.length + 1 + w.length <= 40) cur += ' ' + w;
+      else { lines.push(cur); cur = w; }
+    }
+    if (cur) lines.push(cur);
+    if (!lines.length) lines.push('');
+    const width = Math.max(...lines.map(l => l.length));
+    const top = ' ' + '_'.repeat(width + 2);
+    const bot = ' ' + '-'.repeat(width + 2);
+    let bubble;
+    if (lines.length === 1) {
+      bubble = top + '\n< ' + lines[0].padEnd(width) + ' >\n' + bot;
+    } else {
+      const mid = lines.map((l, i) => {
+        const L = i === 0 ? '/' : (i === lines.length - 1 ? '\\' : '|');
+        const R = i === 0 ? '\\' : (i === lines.length - 1 ? '/' : '|');
+        return L + ' ' + l.padEnd(width) + ' ' + R;
+      }).join('\n');
+      bubble = top + '\n' + mid + '\n' + bot;
+    }
+    const cow = '        \\   ^__^\n         \\  (oo)\\_______\n            (__)\\       )\\/\\\n                ||----w |\n                ||     ||';
+    return bubble + '\n' + cow;
+  }
+
+  function parseCmd(line) {
+    const trimmed = line.trim();
+    if (!trimmed) return ['', ''];
+    const sp = trimmed.indexOf(' ');
+    if (sp === -1) return [trimmed, ''];
+    const name = trimmed.slice(0, sp);
+    let rest = trimmed.slice(sp + 1).trim();
+    if ((rest.startsWith('"') && rest.endsWith('"')) ||
+        (rest.startsWith("'") && rest.endsWith("'"))) {
+      rest = rest.slice(1, -1);
+    }
+    return [name, rest];
+  }
+
+  function execute(line) {
+    const [name, arg] = parseCmd(line);
+    if (!name) return '';
+    if (name === 'cowsay') return cowsay(arg);
+    if (name === 'clear') return '\x00CLEAR\x00';
+    if (name === 'help') return 'available: cowsay <message>, clear, help';
+    return name + ': command not found';
+  }
+
+  function newPromptLine() {
+    screen.insertAdjacentHTML('beforeend', PROMPT_HTML);
+    inputEl = document.createElement('span');
+    inputEl.id = 'input';
+    cursorEl = document.createElement('span');
+    cursorEl.className = 'cursor';
+    screen.append(inputEl, cursorEl);
+  }
+
+  function runCommand(cmd) {
+    inputEl.replaceWith(document.createTextNode(inputEl.textContent));
+    cursorEl.remove();
+    const out = execute(cmd);
+    if (out === '\x00CLEAR\x00') {
+      screen.textContent = '';
+    } else {
+      screen.append(document.createTextNode('\n' + (out ? out + '\n' : '')));
+    }
+    newPromptLine();
+    screen.scrollTop = screen.scrollHeight;
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === 'Enter') {
+      runCommand(inputEl.textContent);
+      e.preventDefault();
+    } else if (e.key === 'Backspace') {
+      inputEl.textContent = inputEl.textContent.slice(0, -1);
+      e.preventDefault();
+    } else if (e.key.length === 1) {
+      inputEl.textContent += e.key;
+      e.preventDefault();
+    }
+  });
 </script>
 </body>
 </html>
